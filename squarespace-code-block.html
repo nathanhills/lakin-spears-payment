@@ -1,0 +1,305 @@
+<!-- ============================================================
+  LAKIN SPEARS — PayTrace Protect.js Payment Form
+  Paste this into a Squarespace Code Block on your payment page.
+  
+  BEFORE YOU GO LIVE: Replace YOUR_VERCEL_URL with your actual
+  Vercel deployment URL, e.g. https://lakin-spears-payment.vercel.app
+  ============================================================ -->
+
+<script src="https://protect.sandbox.paytrace.com/js/protect.min.js"></script>
+
+<style>
+  .pt-payment-wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    font-family: inherit;
+  }
+  .pt-field-group {
+    margin-bottom: 16px;
+  }
+  .pt-field-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  .pt-field-group input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    font-size: 15px;
+    color: #222;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .pt-field-group input:focus {
+    border-color: #222;
+  }
+  /* The Protect.js iframe container */
+  #pt_hpf_form {
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    padding: 4px 0;
+    min-height: 120px;
+    margin-bottom: 16px;
+    background: white;
+  }
+  .pt-row {
+    display: flex;
+    gap: 12px;
+  }
+  .pt-row .pt-field-group {
+    flex: 1;
+  }
+  .pt-submit-btn {
+    width: 100%;
+    padding: 14px;
+    background: #1a1a1a;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s;
+    margin-top: 4px;
+  }
+  .pt-submit-btn:hover:not(:disabled) {
+    background: #333;
+  }
+  .pt-submit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .pt-message {
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    display: none;
+  }
+  .pt-message.success {
+    background: #f0faf4;
+    color: #1a7a3f;
+    border: 1px solid #b6dfc5;
+    display: block;
+  }
+  .pt-message.error {
+    background: #fdf2f2;
+    color: #9b1c1c;
+    border: 1px solid #f5c2c2;
+    display: block;
+  }
+  .pt-loading {
+    text-align: center;
+    padding: 24px;
+    color: #999;
+    font-size: 14px;
+  }
+</style>
+
+<div class="pt-payment-wrap">
+  <div id="pt-form-loading" class="pt-loading">Loading payment form…</div>
+
+  <div id="pt-form-body" style="display:none;">
+    <div class="pt-row">
+      <div class="pt-field-group">
+        <label for="pt-name">Name on card</label>
+        <input type="text" id="pt-name" placeholder="Jane Smith" autocomplete="cc-name" />
+      </div>
+      <div class="pt-field-group">
+        <label for="pt-email">Email</label>
+        <input type="email" id="pt-email" placeholder="jane@example.com" autocomplete="email" />
+      </div>
+    </div>
+
+    <div class="pt-field-group">
+      <label for="pt-amount">Amount ($)</label>
+      <input type="number" id="pt-amount" placeholder="0.00" min="0.01" step="0.01" />
+    </div>
+
+    <div class="pt-field-group">
+      <label>Card details</label>
+      <!-- Protect.js injects its iFrame here -->
+      <div id="pt_hpf_form"></div>
+    </div>
+
+    <button class="pt-submit-btn" id="pt-submit-btn" disabled>Pay Now</button>
+    <div class="pt-message" id="pt-message"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ⚠️  Replace with your Vercel deployment URL
+  const VERCEL_URL = 'YOUR_VERCEL_URL';
+
+  const loadingEl = document.getElementById('pt-form-loading');
+  const formBodyEl = document.getElementById('pt-form-body');
+  const submitBtn = document.getElementById('pt-submit-btn');
+  const messageEl = document.getElementById('pt-message');
+
+  let ptInstance = null;
+
+  function showMessage(text, type) {
+    messageEl.textContent = text;
+    messageEl.className = 'pt-message ' + type;
+  }
+
+  function clearMessage() {
+    messageEl.className = 'pt-message';
+    messageEl.textContent = '';
+  }
+
+  // Step 1: Ask our Vercel backend for a Protect.js clientKey
+  async function initForm() {
+    try {
+      const res = await fetch(`${VERCEL_URL}/api/paytrace-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) throw new Error('Could not initialize payment form.');
+      const { clientKey } = await res.json();
+
+      // Step 2: Set up Protect.js with the clientKey + styling
+      ptInstance = await PTPayment.setup({
+        authorization: { clientKey },
+        styles: {
+          body: { background_color: 'white' },
+          cc: {
+            label_color: '#555',
+            label_size: '13px',
+            font_color: '#222',
+            border_color: '#d0d0d0',
+            border_style: 'solid',
+            input_border_radius: '4px',
+            input_border_width: '1px',
+            input_padding: '0px 14px 0px 14px',
+            height: '44px',
+            width: '100%',
+            font_size: '15px',
+          },
+          exp: {
+            label_color: '#555',
+            label_size: '13px',
+            font_color: '#222',
+            border_color: '#d0d0d0',
+            border_style: 'solid',
+            input_border_radius: '4px',
+            input_border_width: '1px',
+            height: '44px',
+            font_size: '15px',
+            type: 'dropdown',
+          },
+          code: {
+            label_color: '#555',
+            label_size: '13px',
+            font_color: '#222',
+            border_color: '#d0d0d0',
+            border_style: 'solid',
+            input_border_radius: '4px',
+            input_border_width: '1px',
+            height: '44px',
+            width: '90px',
+            font_size: '15px',
+          },
+        },
+      });
+
+      loadingEl.style.display = 'none';
+      formBodyEl.style.display = 'block';
+      submitBtn.disabled = false;
+
+    } catch (err) {
+      loadingEl.textContent = 'Payment form unavailable. Please call us to complete your payment.';
+      console.error('PT init error:', err);
+    }
+  }
+
+  // Step 3: On submit — validate, tokenize, then send to our backend
+  document.getElementById('pt-submit-btn').addEventListener('click', async function () {
+    clearMessage();
+
+    const name = document.getElementById('pt-name').value.trim();
+    const email = document.getElementById('pt-email').value.trim();
+    const amount = document.getElementById('pt-amount').value.trim();
+
+    if (!amount || parseFloat(amount) <= 0) {
+      showMessage('Please enter a valid amount.', 'error');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Processing…';
+
+    PTPayment.validate(async function (validationErrors) {
+      if (validationErrors && validationErrors.length > 0) {
+        const code = validationErrors[0].responseCode;
+        const messages = {
+          '35': 'Please enter a valid credit card number.',
+          '43': 'Please enter a valid expiration month.',
+          '44': 'Please enter a valid expiration year.',
+          '148': 'Please enter a valid security code (CVV).',
+        };
+        showMessage(messages[code] || 'Please check your card details.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Pay Now';
+        return;
+      }
+
+      try {
+        // Tokenize the card — returns hpf_token + enc_key
+        const tokenResult = await ptInstance.process();
+
+        // Step 4: Send tokens (not card data!) to our backend
+        const chargeRes = await fetch(`${VERCEL_URL}/api/paytrace-charge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            hpf_token: tokenResult.message.hpf_token,
+            enc_key: tokenResult.message.enc_key,
+            amount: parseFloat(amount),
+            billing_name: name || undefined,
+            billing_email: email || undefined,
+          }),
+        });
+
+        const chargeData = await chargeRes.json();
+
+        if (!chargeRes.ok || !chargeData.success) {
+          showMessage(chargeData.error || 'Payment was declined. Please try again.', 'error');
+          ptInstance.reset();
+        } else {
+          showMessage(
+            `Payment approved! Confirmation: ${chargeData.transaction_id}`,
+            'success'
+          );
+          // Clear form
+          document.getElementById('pt-name').value = '';
+          document.getElementById('pt-email').value = '';
+          document.getElementById('pt-amount').value = '';
+          ptInstance.reset();
+          submitBtn.style.display = 'none';
+        }
+
+      } catch (err) {
+        console.error('Charge error:', err);
+        showMessage('An unexpected error occurred. Please try again.', 'error');
+        ptInstance.reset();
+      }
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Pay Now';
+    });
+  });
+
+  initForm();
+})();
+</script>

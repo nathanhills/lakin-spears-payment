@@ -1,0 +1,7 @@
+{
+  "name": "lakin-spears-payment",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PayTrace Protect.js backend for Lakin Spears"
+}
