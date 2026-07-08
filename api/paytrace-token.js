@@ -6,6 +6,8 @@ const PAYTRACE_BASE = process.env.PAYTRACE_ENV === 'production'
   ? 'https://api.paytrace.com'
   : 'https://api.sandbox.paytrace.com';
 
+const INTEGRATOR_ID = process.env.PAYTRACE_INTEGRATOR_ID;
+
 async function getBearerToken() {
   const body = new URLSearchParams({
     grant_type: 'client_credentials',
@@ -15,7 +17,10 @@ async function getBearerToken() {
 
   const res = await fetch(`${PAYTRACE_BASE}/v3/token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-Integrator-Id': INTEGRATOR_ID,
+    },
     body: body.toString(),
   });
 
@@ -29,7 +34,6 @@ async function getBearerToken() {
 }
 
 export default async function handler(req, res) {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -46,6 +50,7 @@ export default async function handler(req, res) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${bearerToken}`,
+        'X-Integrator-Id': INTEGRATOR_ID,
       },
     });
 
@@ -55,7 +60,6 @@ export default async function handler(req, res) {
     }
 
     const tokenData = await tokenRes.json();
-    // clientKey is valid for 20 minutes — safe to send to the browser
     return res.status(200).json({ clientKey: tokenData.clientKey });
 
   } catch (err) {
