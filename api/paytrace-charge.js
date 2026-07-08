@@ -6,7 +6,8 @@ const PAYTRACE_BASE = process.env.PAYTRACE_ENV === 'production'
   ? 'https://api.paytrace.com'
   : 'https://api.sandbox.paytrace.com';
 
-const MERCHANT_ID = parseInt(process.env.PAYTRACE_MERCHANT_ID, 10); // 888000002887
+const MERCHANT_ID = parseInt(process.env.PAYTRACE_MERCHANT_ID, 10);
+const INTEGRATOR_ID = process.env.PAYTRACE_INTEGRATOR_ID;
 
 async function getBearerToken() {
   const body = new URLSearchParams({
@@ -17,7 +18,10 @@ async function getBearerToken() {
 
   const res = await fetch(`${PAYTRACE_BASE}/v3/token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-Integrator-Id': INTEGRATOR_ID,
+    },
     body: body.toString(),
   });
 
@@ -31,7 +35,6 @@ async function getBearerToken() {
 }
 
 export default async function handler(req, res) {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -42,7 +45,6 @@ export default async function handler(req, res) {
 
   const { hpf_token, enc_key, amount, billing_name, billing_email, description } = req.body;
 
-  // Basic validation
   if (!hpf_token || !enc_key || !amount) {
     return res.status(400).json({ error: 'Missing required payment fields.' });
   }
@@ -70,6 +72,7 @@ export default async function handler(req, res) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${bearerToken}`,
+        'X-Integrator-Id': INTEGRATOR_ID,
       },
       body: JSON.stringify(payload),
     });
@@ -84,7 +87,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Success — return safe transaction info (no card data)
     return res.status(200).json({
       success: true,
       transaction_id: chargeData.transaction_id,
