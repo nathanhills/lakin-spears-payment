@@ -9,6 +9,14 @@ const PAYTRACE_BASE = process.env.PAYTRACE_ENV === 'production'
 const MERCHANT_ID = parseInt(process.env.PAYTRACE_MERCHANT_ID, 10);
 const INTEGRATOR_ID = process.env.PAYTRACE_INTEGRATOR_ID;
 
+// PayTrace wraps responses in { status, status_code, data: {...} }
+// but may also return flat objects. Handle both shapes.
+function unwrap(payload) {
+  return payload && typeof payload.data === 'object' && payload.data !== null
+    ? payload.data
+    : payload;
+}
+
 async function getBearerToken() {
   const body = new URLSearchParams({
     grant_type: 'client_credentials',
@@ -30,8 +38,14 @@ async function getBearerToken() {
     throw new Error(`Auth failed: ${res.status} ${text}`);
   }
 
-  const data = await res.json();
-  return data.access_token;
+  const payload = await res.json();
+  const tokenData = unwrap(payload);
+
+  if (!tokenData.access_token) {
+    throw new Error(`No access_token in response: ${JSON.stringify(payload).slice(0, 200)}`);
+  }
+
+  return tokenData.access_token;
 }
 
 export default async function handler(req, res) {
@@ -77,13 +91,13 @@ export default async function handler(req, res) {
       body: JSON.stringify(payload),
     });
 
-    const chargeData = await chargeRes.json();
+    const rawCharge = await chargeRes.json();
+    const chargeData = unwrap(rawCharge);
 
     if (!chargeRes.ok) {
-      console.error('PayTrace charge error:', chargeData);
+      console.error('PayTrace charge error:', JSON.stringify(rawCharge).slice(0, 500));
       return res.status(400).json({
-        error: chargeData?.message || 'Payment was declined. Please check your card details.',
-        details: chargeData,
+        error: chargeData?.message || rawCharge?.message || 'Payment was declined. Please check your card details.',
       });
     }
 
