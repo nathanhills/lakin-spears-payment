@@ -8,6 +8,14 @@ const PAYTRACE_BASE = process.env.PAYTRACE_ENV === 'production'
 
 const INTEGRATOR_ID = process.env.PAYTRACE_INTEGRATOR_ID;
 
+// PayTrace wraps responses in { status, status_code, data: {...} }
+// but may also return flat objects. Handle both shapes.
+function unwrap(payload) {
+  return payload && typeof payload.data === 'object' && payload.data !== null
+    ? payload.data
+    : payload;
+}
+
 async function getBearerToken() {
   const body = new URLSearchParams({
     grant_type: 'client_credentials',
@@ -29,8 +37,14 @@ async function getBearerToken() {
     throw new Error(`Auth failed: ${res.status} ${text}`);
   }
 
-  const data = await res.json();
-  return data.access_token;
+  const payload = await res.json();
+  const tokenData = unwrap(payload);
+
+  if (!tokenData.access_token) {
+    throw new Error(`No access_token in response: ${JSON.stringify(payload).slice(0, 200)}`);
+  }
+
+  return tokenData.access_token;
 }
 
 export default async function handler(req, res) {
@@ -59,8 +73,14 @@ export default async function handler(req, res) {
       throw new Error(`Token fetch failed: ${tokenRes.status} ${text}`);
     }
 
-    const tokenData = await tokenRes.json();
-    return res.status(200).json({ clientKey: tokenData.clientKey });
+    const payload = await tokenRes.json();
+    const fieldData = unwrap(payload);
+
+    if (!fieldData.clientKey) {
+      throw new Error(`No clientKey in response: ${JSON.stringify(payload).slice(0, 200)}`);
+    }
+
+    return res.status(200).json({ clientKey: fieldData.clientKey });
 
   } catch (err) {
     console.error('paytrace-token error:', err.message);
